@@ -12,93 +12,95 @@ if (isset($_GET['q'])) {
     $q = $_GET['q'];
 
     $indexParams['index'] = 'my18';
-    $index = $client->indices()->exists($indexParams);  // перевіряю чи немає такого уже створеного індекса  (в elasticsearch це як база даних в mysql)
-    if (!$index) {  // і якщо його немає то створюю
+    $index = $client->indices()->exists($indexParams); // перевіряю чи немає такого уже створеного індекса  (в elasticsearch це як база даних в mysql)
+    if (!$index) {
+        // і якщо його немає то створюю
 
-    try {
-        $params = [
-            'index' => 'my18', // назва індекса
-            'body' => [
-                'settings' => [
-                    'number_of_shards' => 1,
-                    'number_of_replicas' => 0,
-                    'analysis' => [
-                        'filter' => [
-                            'shingle' => [
-                                'type' => 'shingle',
+        try {
+            $params = [
+                'index' => 'my18', // назва індекса
+                'body' => [
+                    'settings' => [
+                        'number_of_shards' => 1,
+                        'number_of_replicas' => 0,
+                        'analysis' => [
+                            'filter' => [
+                                'shingle' => [
+                                    'type' => 'shingle',
+                                ],
+                                'russian_stemmer' => [ // тут створила додатковий фільтер для налаштування російського аналізатора
+                                    'type' => 'stemmer',
+                                    'language' => 'russian',
+                                ],
+
                             ],
-                            'russian_stemmer' => [  // тут створила додатковий фільтер для налаштування російського аналізатора
-                                'type' => 'stemmer',
-                                'language' => 'russian',
+                            'char_filter' => [
+                                'pre_negs' => [
+                                    'type' => 'pattern_replace',
+                                    'pattern' => '(\\w+)\\s+((?i:never|no|nothing|nowhere|noone|none|not|havent|hasnt|hadnt|cant|couldnt|shouldnt|wont|wouldnt|dont|doesnt|didnt|isnt|arent|aint))\\b',
+                                    'replacement' => '~$1 $2',
+                                ],
+                                'post_negs' => [
+                                    'type' => 'pattern_replace',
+                                    'pattern' => '\\b((?i:never|no|nothing|nowhere|noone|none|not|havent|hasnt|hadnt|cant|couldnt|shouldnt|wont|wouldnt|dont|doesnt|didnt|isnt|arent|aint))\\s+(\\w+)',
+                                    'replacement' => '$1 ~$2',
+                                ],
                             ],
 
+                            'analyzer' => [
+                                'reuters' => [ // назва мого аналізатора, який я налаштувала
+                                    'type' => 'custom',
+                                    'tokenizer' => 'standard',
+                                    'filter' => ['lowercase', 'stop', 'kstem', 'russian_stemmer'], // передаю сюди фільтер з російським аналізатором
+                                ],
+                            ],
                         ],
-                        'char_filter' => [
-                            'pre_negs' => [
-                                'type' => 'pattern_replace',
-                                'pattern' => '(\\w+)\\s+((?i:never|no|nothing|nowhere|noone|none|not|havent|hasnt|hadnt|cant|couldnt|shouldnt|wont|wouldnt|dont|doesnt|didnt|isnt|arent|aint))\\b',
-                                'replacement' => '~$1 $2',
+                    ],
+                    'mappings' => [ // mappings це як створення полів і їх налаштувань
+                        'properties' => [
+                            'title' => [
+                                'type' => 'text', // тип поля
+                                'analyzer' => 'reuters', // акий аналізатор
+                                'copy_to' => 'combined',
+                                'fielddata' => true, //  ці налаштування були необхідня для того щоб можна було по цьому полю відсортувати, без цього видась помилки при спробі запустити 'sort'
                             ],
-                            'post_negs' => [
-                                'type' => 'pattern_replace',
-                                'pattern' => '\\b((?i:never|no|nothing|nowhere|noone|none|not|havent|hasnt|hadnt|cant|couldnt|shouldnt|wont|wouldnt|dont|doesnt|didnt|isnt|arent|aint))\\s+(\\w+)',
-                                'replacement' => '$1 ~$2',
+                            'body' => [
+                                'type' => 'text',
+                                'analyzer' => 'reuters',
+                                'copy_to' => 'combined',
                             ],
-                        ],
-
-                        'analyzer' => [
-                            'reuters' => [  // назва мого аналізатора, який я налаштувала
-                                'type' => 'custom',
-                                'tokenizer' => 'standard',
-                                'filter' => ['lowercase', 'stop', 'kstem', 'russian_stemmer'], // передаю сюди фільтер з російським аналізатором
+                            'combined' => [
+                                'type' => 'text',
+                                'analyzer' => 'reuters',
+                            ],
+                            'topics' => [
+                                'type' => 'keyword',
+                            ],
+                            'places' => [
+                                'type' => 'keyword',
                             ],
                         ],
                     ],
                 ],
-                'mappings' => [  // mappings це як створення полів і їх налаштувань
-                    'properties' => [
-                        'title' => [
-                            'type' => 'text', // тип поля
-                            'analyzer' => 'reuters',  // акий аналізатор
-                            'copy_to' => 'combined',
-                            'fielddata' => true, //  ці налаштування були необхідня для того щоб можна було по цьому полю відсортувати, без цього видась помилки при спробі запустити 'sort'
-                        ],
-                        'body' => [
-                            'type' => 'text',
-                            'analyzer' => 'reuters',
-                            'copy_to' => 'combined',
-                        ],
-                        'combined' => [
-                            'type' => 'text',
-                            'analyzer' => 'reuters',
-                        ],
-                        'topics' => [
-                            'type' => 'keyword',
-                        ],
-                        'places' => [
-                            'type' => 'keyword',
-                        ],
-                    ],
-                ],
-            ],
-        ];
-        $client->indices()->create($params);   // створюю індекс по заданим вище параметрам
+            ];
+            $client->indices()->create($params); // створюю індекс по заданим вище параметрам
 
-    } catch (Exception $e) {
-        echo 'Выброшено исключение: ', $e->getMessage(), "\n";
+        } catch (Exception $e) {
+            echo 'Выброшено исключение: ', $e->getMessage(), "\n";
+        }
     }
 
     try {
-        $querys = $client->search([   // створюю і налаштовую параметри пошуку
-            'index' => 'my18',  // назва індексу
+        $querys = $client->search([ // створюю і налаштовую параметри пошуку
+            'index' => 'my18', // назва індексу
             'body' => [
                 "query" => [
                     'bool' => [
-                        'should' => [  // ще є параметер must який повертатиме лише строго відповідні до запиту пощуку данні, should  більш гнучкий
+                        'should' => [ // ще є параметер must який повертатиме лише строго відповідні до запиту пощуку данні, should  більш гнучкий
                             "match" => [
                                 "title" => [
-                                    "query" => $q, // ту слово по якому ми шукажмо
-                                    "fuzziness" => 2,// налаштування кількості можливих опечаток і помилок в слові (посимвольно)
+                                    "query" => $q, // тут слово по якому ми шукажмо
+                                    "fuzziness" => 2, // налаштування кількості можливих опечаток і помилок в слові (посимвольно)
                                     "operator" => "and", // можна передати ще 'or' теж для гнучності пошуку
                                 ],
                             ],
@@ -119,7 +121,8 @@ if (isset($_GET['q'])) {
         echo 'Выброшено исключение1: ', $e->getMessage(), "\n";
     }
 
-    if ($querys['hits']['total'] >= 1) { // якщо в запиті по пошуку є співпадіння по типу (аналог таблиці)
+    if ($querys['hits']['total'] >= 1) {
+        // якщо в запиті по пошуку є співпадіння по типу (аналог таблиці)
 
         $results = $querys['hits']['hits']; // отримуємо всі співпадіння з таблиці
 
@@ -128,8 +131,8 @@ if (isset($_GET['q'])) {
         }, $querys['hits']['hits']);
 
     }
-
 }
+
 ?>
 
 <!-- HTML STARTS HERE -->
