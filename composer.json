@@ -1,0 +1,6 @@
+{
+    "require": {
+        "elasticsearch/elasticsearch": "^7.5",
+        "ahmedkhan847/mysqlwithelasticsearch": "2.*"
+    }
+}

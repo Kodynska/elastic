@@ -1,0 +1,42 @@
+version: '3'
+
+services:
+  webserver:
+    build: ./bin/webserver
+    container_name: 'webserver2'
+    ports:
+      - "888:80"
+    volumes:
+      - ./www:/var/www/html
+      - ./config/vhosts:/etc/apache2/sites-enabled
+
+  mysql:
+    build: ./bin/mysql
+    container_name: 'mysql2'
+    volumes:
+      -  ./data/mysql:/docker-entrypoint-initdb.d:ro
+    environment:
+      MYSQL_ROOT_PASSWORD: pswd
+      MYSQL_DATABASE: test
+
+  elastic:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.5.1
+    # build: ./bin/elastic
+    container_name: 'elastic2'
+    environment:
+           - cluster.name=demo
+           # - xpack.security.audit.enabled=true
+           # - logger.authc.name=org.elasticsearch.xpack.security.authc
+           # - logger.authc.level=DEBUG
+           # - bootstrap.memory_lock=true
+           - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+           - transport.host=0.0.0.0
+    ports:
+    - 9200:9200
+  web:
+    image: php:7.2.2-apache
+    container_name: php_web2
+    volumes:
+      - ./php/:/var/www/html/
+    # ports:
+    #   - "8100:80"
